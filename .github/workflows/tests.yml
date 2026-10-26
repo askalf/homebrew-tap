@@ -1,0 +1,50 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash -xeuo pipefail {0}
+
+jobs:
+  formula:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@4790763c0a3ba4036f72634dc079c4a7dfcd4878 # 2026.10.19.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tap syntax
+        run: |
+          brew readall askalf/tap
+          brew style askalf/tap
+
+      - name: Install from source
+        run: brew install --build-from-source --verbose askalf/tap/dario
+
+      - name: Test
+        run: brew test --verbose askalf/tap/dario
+
+      - name: Audit
+        run: brew audit --strict --online askalf/tap/dario
+
+      - name: Installed version matches the formula
+        run: |
+          installed="$(dario --version)"
+          formula="$(brew info --json=v2 askalf/tap/dario | jq -r '.formulae[0].versions.stable')"
+          test "$installed" = "$formula"
