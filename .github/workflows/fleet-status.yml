@@ -57,8 +57,11 @@ jobs:
          github.event.workflow_run.head_repository.full_name != github.repository))) ||
       (github.event_name != 'issue_comment' && github.event_name != 'workflow_run' &&
        github.event.pull_request.head.repo.full_name == github.repository)
-    # This repository has no exec runner row, so the job runs on GitHub's runners.
-    runs-on: ubuntu-latest
+    # On our runner for every event, a fork's included: the job runs the pinned fleet-status action
+    # and never PR code (see above), so GitHub's hosted queue going down does not hold the
+    # fleet/verify and fleet/review statuses a merge waits on.
+    # A fork repository has no homebrew-tap-exec runners, so there it runs on GitHub's.
+    runs-on: ${{ github.repository == 'askalf/homebrew-tap' && fromJSON('["self-hosted","homebrew-tap-exec"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
