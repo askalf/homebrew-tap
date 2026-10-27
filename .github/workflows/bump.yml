@@ -36,7 +36,7 @@ jobs:
       - name: Rewrite the formula to the latest npm release
         id: bump
         working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
-        run: scripts/bump-dario.sh
+        run: bash scripts/bump-dario.sh
 
       - name: Install and test the rewritten formula
         if: steps.bump.outputs.changed != ''
