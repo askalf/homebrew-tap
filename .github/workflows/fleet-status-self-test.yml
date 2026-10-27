@@ -4,6 +4,9 @@
 # review relay. The workflows are read as text from the PR's checkout with a read-only token;
 # nothing in them runs. The paths are every file the check reads.
 # self-test is not a required check here, so a PR that touches none of them runs nothing.
+# min-own-exprs counts the expressions that send a fork's PR to GitHub's runners: only this job's,
+# since tests and bump run on GitHub's runners and the status and backfill jobs run ours for every
+# event. So the floor is 1 here, not 5.
 name: Fleet status self-test
 
 on:
@@ -31,4 +34,4 @@ jobs:
 
       - uses: askalf/ci/actions/fleet-status-check@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
         with:
-          min-own-exprs: '5'
+          min-own-exprs: '1'
