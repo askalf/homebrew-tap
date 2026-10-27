@@ -4,11 +4,9 @@
 # review relay. The workflows are read as text from the PR's checkout with a read-only token;
 # nothing in them runs. The paths are every file the check reads.
 # self-test is not a required check here, so a PR that touches none of them runs nothing.
-# min-own-exprs is 1: this job's runs-on is the repository's only own-code expression. The
-# check counts an expression as own-code only when a fork's PR lands on GitHub's runners, so
-# fleet-status and its backfill (the repository-only form, jobs that never run PR code) do not
-# count, and tests and bump stay on GitHub's runners because they need Homebrew on macOS and
-# Ubuntu images. A floor above 1 fails on every PR here; it is not cordon's 5.
+# min-own-exprs counts the expressions that send a fork's PR to GitHub's runners: only this job's,
+# since tests and bump run on GitHub's runners and the status and backfill jobs run ours for every
+# event. So the floor is 1 here, not 5.
 name: Fleet status self-test
 
 on:
