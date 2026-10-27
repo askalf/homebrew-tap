@@ -1,0 +1,24 @@
+# Manual: posts the fleet review-lane statuses on every open same-repo PR. Run it right after
+# the fleet/* contexts become required checks, so PRs opened before that report.
+name: Fleet status backfill
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  backfill:
+    # This repository has no exec runner row, so the job runs on GitHub's runners.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      statuses: write
+    steps:
+      - uses: askalf/ci/actions/fleet-status@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+        with:
+          all-open: 'true'
