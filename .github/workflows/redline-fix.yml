@@ -1,0 +1,55 @@
+# Redline fix: when Redline requests changes on a pull request here, forge dispatches this run
+# with the PR, the head Redline reviewed and the review. The fix itself is computed by
+# askalf/ci (redline-fix-run.yml) on this repository's fix-lane runner and uploaded as
+# the redline-fix artifact. Nothing here pushes or comments, and no token that could is on the
+# runner: forge verifies the artifact and pushes the fix to the PR branch with its own token.
+name: Redline fix
+run-name: Redline fix ${{ github.repository }}#${{ inputs.pr }} @ ${{ inputs.head }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number.
+        required: true
+        type: string
+      head:
+        description: The full commit sha Redline reviewed. The run fails if the PR has moved past it.
+        required: true
+        type: string
+      review:
+        description: URL of the REQUEST_CHANGES review being answered.
+        required: true
+        type: string
+      dry_run:
+        description: Compute the fix and upload its diff; no commit, no bundle.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Grouped per review, not per PR: a GitHub concurrency group only ever keeps one running and
+# one pending run, so grouping by PR would let a third dispatch for the same PR cancel a still-
+# pending second one before it produces an artifact. Each review has its own group instead, so
+# concurrent dispatches for the same PR never collide; forge's head verification on push rejects
+# any fix whose head has gone stale by the time it lands.
+concurrency:
+  group: fix-${{ github.repository }}-${{ inputs.review }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    # Pinned so a change to the fix workflow reaches this repo only through a reviewed bump here.
+    uses: askalf/ci/.github/workflows/redline-fix-run.yml@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+    with:
+      redline-ref: e6a0901235a1d880cf620d23eece2ba63bd042f9
+      # homebrew-tap-fix is this repository's fix-lane runner: its own non-root account, one job
+      # per registration. Only this workflow targets that label.
+      runner-label: homebrew-tap-fix
+      pr: ${{ inputs.pr }}
+      head: ${{ inputs.head }}
+      review: ${{ inputs.review }}
+      dry_run: ${{ inputs.dry_run }}
