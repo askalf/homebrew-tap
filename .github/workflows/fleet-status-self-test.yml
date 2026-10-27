@@ -31,4 +31,7 @@ jobs:
 
       - uses: askalf/ci/actions/fleet-status-check@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
         with:
-          min-own-exprs: '5'
+          # Three workflows carry the own-code expression here: fleet-status, its backfill and this
+          # self-test. The formula tests run on a macOS and Ubuntu matrix GitHub hosts, and the
+          # bump workflow stays on GitHub's runners, so the floor is 3, not cordon's 5.
+          min-own-exprs: '3'
