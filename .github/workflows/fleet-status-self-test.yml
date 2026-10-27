@@ -31,4 +31,6 @@ jobs:
 
       - uses: askalf/ci/actions/fleet-status-check@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
         with:
-          min-own-exprs: '5'
+          # The three fleet jobs are this repository's only own-runner expressions: tests and bump
+          # run on GitHub's runners.
+          min-own-exprs: '3'
