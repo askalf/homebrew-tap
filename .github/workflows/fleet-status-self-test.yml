@@ -16,8 +16,11 @@ permissions: {}
 
 jobs:
   self-test:
-    # This repository has no exec runner row, so the job runs on GitHub's runners.
-    runs-on: ubuntu-latest
+    # Our own code (pushes, same-repo PRs, schedules, dispatches) runs on homebrew-tap-exec, our non-root
+    # one-job runners, so GitHub's hosted queue going down does not hold our PRs. A fork's PR
+    # and a Dependabot PR run code nobody here wrote, and a fork repository has no homebrew-tap-exec
+    # runners, so those stay on GitHub's runners.
+    runs-on: ${{ (github.repository != 'askalf/homebrew-tap' || github.event.pull_request && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]')) && 'ubuntu-latest' || fromJSON('["self-hosted","homebrew-tap-exec"]') }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -28,4 +31,4 @@ jobs:
 
       - uses: askalf/ci/actions/fleet-status-check@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
         with:
-          min-own-exprs: '0'
+          min-own-exprs: '5'
