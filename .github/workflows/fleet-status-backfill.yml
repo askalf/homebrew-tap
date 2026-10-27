@@ -1,0 +1,26 @@
+# Manual: posts the fleet review-lane statuses on every open same-repo PR. Run it right after
+# the fleet/* contexts become required checks, so PRs opened before that report.
+name: Fleet status backfill
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  backfill:
+    # Our own script on its own trigger, never PR code: on our runner, so GitHub's hosted
+    # queue going down does not stop it.
+    # A fork repository has no homebrew-tap-exec runners, so there it runs on GitHub's.
+    runs-on: ${{ github.repository == 'askalf/homebrew-tap' && fromJSON('["self-hosted","homebrew-tap-exec"]') || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: read
+      statuses: write
+    steps:
+      - uses: askalf/ci/actions/fleet-status@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+        with:
+          all-open: 'true'
