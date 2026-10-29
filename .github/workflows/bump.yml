@@ -62,7 +62,9 @@ jobs:
           token: ${{ secrets.TAP_BOT_PAT }}
 
       # One open pull request per version. A newer release closes the older one, so main never
-      # takes a version that a later bump already replaced.
+      # takes a version that a later bump already replaced. The close runs on every run, also
+      # when this version's pull request is already open, so a run that opened it and then
+      # failed to close an older one is repaired by the next.
       - name: Open the pull request
         if: steps.bump.outputs.changed != ''
         working-directory: pull-request
@@ -72,22 +74,22 @@ jobs:
           FORMULA: ${{ steps.set-up-homebrew.outputs.repository-path }}/Formula/dario.rb
         run: |
           branch="bot/dario-${VERSION}"
-          open="$(gh pr list --head "${branch}" --state open --json number --jq '.[].number')"
-          if [[ -n "${open}" ]]; then
-            echo "pull request #${open} already proposes dario ${VERSION}"
-            exit 0
-          fi
-          cp "${FORMULA}" Formula/dario.rb
-          git checkout -b "${branch}"
-          git add Formula/dario.rb
-          git commit -m "dario ${VERSION}"
-          git push --force origin "HEAD:refs/heads/${branch}"
-          cat >"${RUNNER_TEMP}/body.md" <<EOF
+          url="$(gh pr list --head "${branch}" --state open --json url --jq '.[].url')"
+          if [[ -n "${url}" ]]; then
+            echo "${url} already proposes dario ${VERSION}"
+          else
+            cp "${FORMULA}" Formula/dario.rb
+            git checkout -b "${branch}"
+            git add Formula/dario.rb
+            git commit -m "dario ${VERSION}"
+            git push --force origin "HEAD:refs/heads/${branch}"
+            cat >"${RUNNER_TEMP}/body.md" <<EOF
           Moves \`Formula/dario.rb\` to [@askalf/dario ${VERSION}](https://www.npmjs.com/package/@askalf/dario/v/${VERSION}).
 
           Before this pull request was opened, the bump run checked the tarball's sha512 against the npm registry, verified its provenance (dario's \`cc-drift-auto-release.yml\` on \`master\`, on a GitHub-hosted runner), and installed, tested and audited the rewritten formula.
           EOF
-          url="$(gh pr create --base main --head "${branch}" --title "dario ${VERSION}" --body-file "${RUNNER_TEMP}/body.md")"
+            url="$(gh pr create --base main --head "${branch}" --title "dario ${VERSION}" --body-file "${RUNNER_TEMP}/body.md")"
+          fi
           gh pr list --state open --json number,headRefName \
             --jq '.[] | select(.headRefName | startswith("bot/dario-")) | "\(.number) \(.headRefName)"' |
             while read -r number head; do
