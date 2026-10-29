@@ -36,6 +36,9 @@ jobs:
       - name: Rewrite the formula to the latest npm release
         id: bump
         working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
+        env:
+          # gh attestation verify needs a token to run; it reads nothing from this repository.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/bump-dario.sh
 
       - name: Install and test the rewritten formula
