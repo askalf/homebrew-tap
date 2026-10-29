@@ -90,9 +90,10 @@ jobs:
 
       # Best-effort cleanup: every run that read the latest npm release closes each bot/dario-*
       # pull request for any other version, also when main already has that version and also
-      # when a later step of this run failed. Between runs (six hours, or the next dario
-      # release) an older pull request stays open and mergeable, so its review still has to
-      # check the version against npm. Every page of open pull requests is read before any is
+      # when a later step of this run failed. Between runs (six hours) an older pull request
+      # stays open; tests.yml's latest check refuses it once a newer bump merged, but not when
+      # only npm moved, so it can still merge one release behind until it is closed here. It
+      # never takes main backwards. Every page of open pull requests is read before any is
       # closed (gh pr list stops at 30, and closing while paging shifts later ones onto pages
       # already read), and only this repository's own branches count, so a fork's bot/dario-*
       # branch is never closed or deleted.
