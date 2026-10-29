@@ -1,8 +1,11 @@
 name: bump
 
 # Keeps Formula/dario.rb on the latest @askalf/dario from the npm registry. The rewritten
-# formula is installed and tested on this runner before anything is committed, because a
-# push made with the workflow token does not start the tests workflow.
+# formula is installed and tested on this runner, then proposed as a pull request from a
+# bot/dario-<version> branch: main takes changes only through a pull request whose checks and
+# review passed. The branch is pushed and the pull request opened with TAP_BOT_PAT, a
+# fine-grained token for this repository only (contents and pull requests, read and write),
+# because a pull request opened with the workflow token does not start the tests workflow.
 on:
   schedule:
     - cron: "23 */6 * * *"
@@ -22,7 +25,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
@@ -51,13 +54,44 @@ jobs:
           brew audit --strict --online askalf/tap/dario
           test "$(dario --version)" = "$VERSION"
 
-      - name: Commit and push
+      - name: Check out main to open the pull request from
         if: steps.bump.outputs.changed != ''
-        working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
+        uses: askalf/ci/actions/checkout-with-retry@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+        with:
+          path: pull-request
+          token: ${{ secrets.TAP_BOT_PAT }}
+
+      # One open pull request per version. A newer release closes the older one, so main never
+      # takes a version that a later bump already replaced.
+      - name: Open the pull request
+        if: steps.bump.outputs.changed != ''
+        working-directory: pull-request
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TAP_BOT_PAT }}
           VERSION: ${{ steps.bump.outputs.changed }}
+          FORMULA: ${{ steps.set-up-homebrew.outputs.repository-path }}/Formula/dario.rb
         run: |
+          branch="bot/dario-${VERSION}"
+          open="$(gh pr list --head "${branch}" --state open --json number --jq '.[].number')"
+          if [[ -n "${open}" ]]; then
+            echo "pull request #${open} already proposes dario ${VERSION}"
+            exit 0
+          fi
+          cp "${FORMULA}" Formula/dario.rb
+          git checkout -b "${branch}"
           git add Formula/dario.rb
           git commit -m "dario ${VERSION}"
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          git push --force origin "HEAD:refs/heads/${branch}"
+          cat >"${RUNNER_TEMP}/body.md" <<EOF
+          Moves \`Formula/dario.rb\` to [@askalf/dario ${VERSION}](https://www.npmjs.com/package/@askalf/dario/v/${VERSION}).
+
+          Before this pull request was opened, the bump run checked the tarball's sha512 against the npm registry, verified its provenance (dario's \`cc-drift-auto-release.yml\` on \`master\`, on a GitHub-hosted runner), and installed, tested and audited the rewritten formula.
+          EOF
+          url="$(gh pr create --base main --head "${branch}" --title "dario ${VERSION}" --body-file "${RUNNER_TEMP}/body.md")"
+          gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("bot/dario-")) | "\(.number) \(.headRefName)"' |
+            while read -r number head; do
+              if [[ "${head}" != "${branch}" ]]; then
+                gh pr close "${number}" --delete-branch --comment "Superseded by ${url}."
+              fi
+            done
