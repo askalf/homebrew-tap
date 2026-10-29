@@ -1,8 +1,11 @@
 name: bump
 
 # Keeps Formula/dario.rb on the latest @askalf/dario from the npm registry. The rewritten
-# formula is installed and tested on this runner before anything is committed, because a
-# push made with the workflow token does not start the tests workflow.
+# formula is installed and tested on this runner, then proposed as a pull request from a
+# bot/dario-<version> branch: main takes changes only through a pull request whose checks and
+# review passed. The branch is pushed and the pull request opened with TAP_BOT_PAT, a
+# fine-grained token for this repository only (contents and pull requests, read and write),
+# because a pull request opened with the workflow token does not start the tests workflow.
 on:
   schedule:
     - cron: "23 */6 * * *"
@@ -22,7 +25,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
@@ -51,13 +54,60 @@ jobs:
           brew audit --strict --online askalf/tap/dario
           test "$(dario --version)" = "$VERSION"
 
-      - name: Commit and push
+      - name: Check out main to open the pull request from
         if: steps.bump.outputs.changed != ''
-        working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
+        uses: askalf/ci/actions/checkout-with-retry@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+        with:
+          path: pull-request
+          token: ${{ secrets.TAP_BOT_PAT }}
+
+      - name: Open the pull request
+        if: steps.bump.outputs.changed != ''
+        working-directory: pull-request
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TAP_BOT_PAT }}
           VERSION: ${{ steps.bump.outputs.changed }}
+          FORMULA: ${{ steps.set-up-homebrew.outputs.repository-path }}/Formula/dario.rb
         run: |
-          git add Formula/dario.rb
-          git commit -m "dario ${VERSION}"
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          branch="bot/dario-${VERSION}"
+          # owner:branch matches this repository's branch only, never a fork's branch of the same name.
+          url="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:${branch}" --jq '.[].html_url')"
+          if [[ -n "${url}" ]]; then
+            echo "${url} already proposes dario ${VERSION}"
+          else
+            cp "${FORMULA}" Formula/dario.rb
+            git checkout -b "${branch}"
+            git add Formula/dario.rb
+            git commit -m "dario ${VERSION}"
+            git push --force origin "HEAD:refs/heads/${branch}"
+            cat >"${RUNNER_TEMP}/body.md" <<EOF
+          Moves \`Formula/dario.rb\` to [@askalf/dario ${VERSION}](https://www.npmjs.com/package/@askalf/dario/v/${VERSION}).
+
+          Before this pull request was opened, the bump run checked the tarball's sha512 against the npm registry, verified its provenance (dario's \`cc-drift-auto-release.yml\` on \`master\`, on a GitHub-hosted runner), and installed, tested and audited the rewritten formula.
+          EOF
+            gh pr create --base main --head "${branch}" --title "dario ${VERSION}" --body-file "${RUNNER_TEMP}/body.md"
+          fi
+
+      # Best-effort cleanup: every run that read the latest npm release closes each bot/dario-*
+      # pull request for any other version, also when main already has that version and also
+      # when a later step of this run failed. Between runs (six hours) an older pull request
+      # stays open; tests.yml's latest check refuses it once a newer bump merged, but not when
+      # only npm moved, so it can still merge one release behind until it is closed here. It
+      # never takes main backwards. Every page of open pull requests is read before any is
+      # closed (gh pr list stops at 30, and closing while paging shifts later ones onto pages
+      # already read), and only this repository's own branches count, so a fork's bot/dario-*
+      # branch is never closed or deleted.
+      - name: Close superseded pull requests
+        if: ${{ !cancelled() && steps.bump.outputs.latest != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.TAP_BOT_PAT }}
+          LATEST: ${{ steps.bump.outputs.latest }}
+        run: |
+          prs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.repo.full_name == env.GITHUB_REPOSITORY and (.head.ref | startswith("bot/dario-"))) | "\(.number) \(.head.ref)"')"
+          while read -r number head; do
+            if [[ -n "${number}" && "${head}" != "bot/dario-${LATEST}" ]]; then
+              gh pr close "${number}" --repo "${GITHUB_REPOSITORY}" --delete-branch \
+                --comment "Superseded: dario ${LATEST} is the latest release on npm."
+            fi
+          done <<<"${prs}"

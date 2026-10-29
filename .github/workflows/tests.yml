@@ -49,6 +49,91 @@ jobs:
           formula="$(brew info --json=v2 askalf/tap/dario | jq -r '.formulae[0].versions.stable')"
           test "$installed" = "$formula"
 
+  # A pull request may leave the formula's version alone, or move it forward to the latest npm
+  # release, nothing else. It compares the merge of the pull request into main with main itself,
+  # so with strict required checks on main it runs again whenever a pull request has to be brought
+  # up to date: a bump pull request overtaken by a newer bump that merged fails here instead of
+  # taking main back. A newer npm release alone does not rerun it; bump.yml closes the older pull
+  # request on its next run.
+  latest:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: askalf/ci/actions/checkout-with-retry@e6a0901235a1d880cf620d23eece2ba63bd042f9 # main 2026-10-25, askalf/ci#135
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Formula version is unchanged or the latest npm release
+        run: |
+          # HEAD is the merge of the pull request into main, HEAD^1 is main.
+          version() {
+            git show "$1:Formula/dario.rb" |
+              sed -nE 's#.*dario-([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)\.tgz.*#\1#p' | head -1
+          }
+          # Succeeds when $1 has higher semver precedence than $2. sort -V cannot stand in for
+          # this: it puts 6.19.0 before 6.19.0-rc.1, where semver puts the release after it.
+          newer() {
+            local LC_ALL=C a_pre="" b_pre="" i p q
+            local -a a b
+            [[ "$1" == *-* ]] && a_pre="${1#*-}"
+            [[ "$2" == *-* ]] && b_pre="${2#*-}"
+            IFS=. read -ra a <<<"${1%%-*}"
+            IFS=. read -ra b <<<"${2%%-*}"
+            for i in 0 1 2; do
+              if (( 10#${a[i]} != 10#${b[i]} )); then
+                (( 10#${a[i]} > 10#${b[i]} ))
+                return
+              fi
+            done
+            # Same major.minor.patch: the release outranks each of its prereleases.
+            if [[ -z "$a_pre" || -z "$b_pre" ]]; then
+              [[ -z "$a_pre" && -n "$b_pre" ]]
+              return
+            fi
+            IFS=. read -ra a <<<"$a_pre"
+            IFS=. read -ra b <<<"$b_pre"
+            for (( i = 0; i < ${#a[@]} && i < ${#b[@]}; i++ )); do
+              p="${a[i]}"
+              q="${b[i]}"
+              if [[ "$p" == "$q" ]]; then
+                continue
+              fi
+              # Numeric identifiers compare as numbers and rank below alphanumeric ones, which
+              # compare in ASCII order.
+              if [[ "$p" =~ ^[0-9]+$ && "$q" =~ ^[0-9]+$ ]]; then
+                (( 10#$p > 10#$q ))
+              elif [[ "$p" =~ ^[0-9]+$ || "$q" =~ ^[0-9]+$ ]]; then
+                [[ "$q" =~ ^[0-9]+$ ]]
+              else
+                [[ "$p" > "$q" ]]
+              fi
+              return
+            done
+            (( ${#a[@]} > ${#b[@]} ))
+          }
+          base="$(version HEAD^1)"
+          merged="$(version HEAD)"
+          test -n "$base"
+          test -n "$merged"
+          if [[ "$merged" == "$base" ]]; then
+            echo "formula stays at dario $base"
+            exit 0
+          fi
+          latest="$(npm view @askalf/dario version)"
+          test -n "$latest"
+          if [[ "$merged" != "$latest" ]]; then
+            echo "::error::the formula moves to dario $merged, but the latest npm release is $latest"
+            exit 1
+          fi
+          if ! newer "$merged" "$base"; then
+            echo "::error::the formula moves back from dario $base to $merged"
+            exit 1
+          fi
+          echo "formula moves from dario $base to $merged, the latest npm release"
+
   # The bytes the formula pins must carry dario's release provenance, the same check bump.yml
   # makes before it commits a new version.
   provenance:
