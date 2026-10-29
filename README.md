@@ -17,7 +17,7 @@ Upgrade with `brew upgrade dario`. The formula installs the same package as `npm
 
 ## How the formula stays current
 
-`bump.yml` runs every six hours. It reads the latest version from the npm registry, downloads that tarball, checks its sha512 against the registry's integrity field, writes the new `url` and `sha256` into `Formula/dario.rb`, installs and tests the rewritten formula on the runner, and commits only if all of that passed. `tests.yml` installs the formula from source on macOS and Linux on every push and pull request, then runs `brew test`, `brew audit --strict --online` and `brew style`.
+`bump.yml` runs every six hours. It reads the latest version from the npm registry, downloads that tarball, checks its sha512 against the registry's integrity field, verifies its signed npm provenance (built by dario's `cc-drift-auto-release.yml` on `master`, on a GitHub-hosted runner, with `gh attestation verify`), writes the new `url` and `sha256` into `Formula/dario.rb`, installs and tests the rewritten formula on the runner, and commits only if all of that passed. A release published to npm any other way is never picked up. `tests.yml` installs the formula from source on macOS and Linux on every push and pull request, then runs `brew test`, `brew audit --strict --online` and `brew style`, and checks that the tarball the formula pins carries the same provenance.
 
 ## Problems
 

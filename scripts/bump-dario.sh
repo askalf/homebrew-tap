@@ -36,6 +36,9 @@ then
   echo "  download: ${actual}" >&2
   exit 1
 fi
+# Integrity only proves the bytes are what the registry serves. Provenance proves the registry
+# got them from dario's release workflow, so a release published any other way is never tapped.
+bash scripts/verify-dario-provenance.sh "${latest}" "${work}/dario.tgz"
 sha256="$(openssl dgst -sha256 "${work}/dario.tgz" | sed 's/^.*= //')"
 
 sed -i.bak -E \
