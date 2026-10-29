@@ -70,7 +70,8 @@ jobs:
           FORMULA: ${{ steps.set-up-homebrew.outputs.repository-path }}/Formula/dario.rb
         run: |
           branch="bot/dario-${VERSION}"
-          url="$(gh pr list --head "${branch}" --state open --json url --jq '.[].url')"
+          # owner:branch matches this repository's branch only, never a fork's branch of the same name.
+          url="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:${branch}" --jq '.[].html_url')"
           if [[ -n "${url}" ]]; then
             echo "${url} already proposes dario ${VERSION}"
           else
@@ -91,14 +92,16 @@ jobs:
       # closed, so main never takes a version a later release replaced. This runs on every run,
       # also when main already has the latest version, so an older pull request left open by a
       # run that failed before this step is closed by the next run even after the newer one merged.
+      # Every page of open pull requests is read (gh pr list stops at 30), and only this
+      # repository's own branches count, so a fork's bot/dario-* branch is never closed or deleted.
       - name: Close superseded pull requests
         if: steps.bump.outputs.latest != ''
         env:
           GH_TOKEN: ${{ secrets.TAP_BOT_PAT }}
           LATEST: ${{ steps.bump.outputs.latest }}
         run: |
-          gh pr list --repo "${GITHUB_REPOSITORY}" --state open --json number,headRefName \
-            --jq '.[] | select(.headRefName | startswith("bot/dario-")) | "\(.number) \(.headRefName)"' |
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.repo.full_name == env.GITHUB_REPOSITORY and (.head.ref | startswith("bot/dario-"))) | "\(.number) \(.head.ref)"' |
             while read -r number head; do
               if [[ "${head}" != "bot/dario-${LATEST}" ]]; then
                 gh pr close "${number}" --repo "${GITHUB_REPOSITORY}" --delete-branch \
