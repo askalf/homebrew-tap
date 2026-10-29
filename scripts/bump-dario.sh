@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rewrite Formula/dario.rb to the latest @askalf/dario on the npm registry.
 # Prints "changed=<version>" when the formula moved and "changed=" when it did not,
-# so the workflow can decide whether there is anything to test and commit.
+# so the workflow can decide whether there is anything to test and commit, and
+# "latest=<version>" on every run, so the workflow can close pull requests for any other version.
 set -euo pipefail
 
 formula="Formula/dario.rb"
@@ -13,6 +14,7 @@ then
   echo "could not read versions (latest='${latest}', current='${current}')" >&2
   exit 1
 fi
+echo "latest=${latest}" >>"${GITHUB_OUTPUT:-/dev/null}"
 if [[ "${latest}" == "${current}" ]]
 then
   echo "formula already at ${current}"
