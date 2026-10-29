@@ -88,23 +88,25 @@ jobs:
             gh pr create --base main --head "${branch}" --title "dario ${VERSION}" --body-file "${RUNNER_TEMP}/body.md"
           fi
 
-      # Only the latest npm release may stay proposed: every other bot/dario-* pull request is
-      # closed, so main never takes a version a later release replaced. This runs on every run,
-      # also when main already has the latest version, so an older pull request left open by a
-      # run that failed before this step is closed by the next run even after the newer one merged.
-      # Every page of open pull requests is read (gh pr list stops at 30), and only this
-      # repository's own branches count, so a fork's bot/dario-* branch is never closed or deleted.
+      # Best-effort cleanup: every run that read the latest npm release closes each bot/dario-*
+      # pull request for any other version, also when main already has that version and also
+      # when a later step of this run failed. Between runs (six hours, or the next dario
+      # release) an older pull request stays open and mergeable, so its review still has to
+      # check the version against npm. Every page of open pull requests is read before any is
+      # closed (gh pr list stops at 30, and closing while paging shifts later ones onto pages
+      # already read), and only this repository's own branches count, so a fork's bot/dario-*
+      # branch is never closed or deleted.
       - name: Close superseded pull requests
-        if: steps.bump.outputs.latest != ''
+        if: ${{ !cancelled() && steps.bump.outputs.latest != '' }}
         env:
           GH_TOKEN: ${{ secrets.TAP_BOT_PAT }}
           LATEST: ${{ steps.bump.outputs.latest }}
         run: |
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-            --jq '.[] | select(.head.repo.full_name == env.GITHUB_REPOSITORY and (.head.ref | startswith("bot/dario-"))) | "\(.number) \(.head.ref)"' |
-            while read -r number head; do
-              if [[ "${head}" != "bot/dario-${LATEST}" ]]; then
-                gh pr close "${number}" --repo "${GITHUB_REPOSITORY}" --delete-branch \
-                  --comment "Superseded: dario ${LATEST} is the latest release on npm."
-              fi
-            done
+          prs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.repo.full_name == env.GITHUB_REPOSITORY and (.head.ref | startswith("bot/dario-"))) | "\(.number) \(.head.ref)"')"
+          while read -r number head; do
+            if [[ -n "${number}" && "${head}" != "bot/dario-${LATEST}" ]]; then
+              gh pr close "${number}" --repo "${GITHUB_REPOSITORY}" --delete-branch \
+                --comment "Superseded: dario ${LATEST} is the latest release on npm."
+            fi
+          done <<<"${prs}"
