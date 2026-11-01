@@ -1,6 +1,7 @@
 # askalf/homebrew-tap
 
 [![CI on pitlane](https://img.shields.io/endpoint?url=https%3A%2F%2Fpitlane.askalf.org%2Fbadge.json)](https://pitlane.askalf.org/)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/askalf/homebrew-tap/badge)](https://scorecard.dev/viewer/?uri=github.com/askalf/homebrew-tap)
 
 Homebrew formulae for [dario](https://github.com/askalf/dario), the local endpoint that runs the AI coding tools you own on your Claude and ChatGPT subscriptions.
 
