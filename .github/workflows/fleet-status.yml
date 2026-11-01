@@ -26,7 +26,7 @@ on:
   issue_comment:
     types: [created, edited, deleted]
   workflow_run:
-    workflows: ['Fleet status self-test', 'Fleet review relay', tests, bump, Redline, 'Public text']
+    workflows: ['Fleet status self-test', 'Fleet review relay', tests, bump, CodeQL, Redline, 'Public text']
     types: [completed]
 
 permissions: {}
