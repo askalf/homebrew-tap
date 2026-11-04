@@ -25,7 +25,9 @@ fi
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 url="https://registry.npmjs.org/@askalf/dario/-/dario-${latest}.tgz"
-curl -fsSL --retry 3 -o "${work}/dario.tgz" "${url}"
+# The release dispatch can land before the tarball is served, and plain --retry does not retry a
+# 404 (red 11 seconds after 6.20.3 published): retry every error, spaced out.
+curl -fsSL --retry 6 --retry-all-errors --retry-delay 10 -o "${work}/dario.tgz" "${url}"
 
 # The registry publishes a sha512 integrity string; the downloaded bytes must match it
 # before any digest of them goes into the formula.
