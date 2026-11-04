@@ -25,7 +25,7 @@ fi
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT
 url="https://registry.npmjs.org/@askalf/dario/-/dario-${latest}.tgz"
-curl -fsSL --retry 3 -o "${work}/dario.tgz" "${url}"
+bash "$(dirname "$0")/fetch-tarball.sh" "${url}" "${work}/dario.tgz"
 
 # The registry publishes a sha512 integrity string; the downloaded bytes must match it
 # before any digest of them goes into the formula.
