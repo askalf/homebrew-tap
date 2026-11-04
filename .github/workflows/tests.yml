@@ -136,6 +136,19 @@ jobs:
 
   # The bytes the formula pins must carry dario's release provenance, the same check bump.yml
   # makes before it commits a new version.
+  # The bump downloads through this script. Hosted: the test needs only node, curl and bash.
+  scripts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: askalf/ci/actions/checkout-with-retry@561d1f78600ad51d894fb987ef240b77b52e5720 # main 2026-11-03, askalf/ci#173
+        with:
+          persist-credentials: false
+
+      - name: Tarball download retries a fresh release 404
+        run: bash tests/fetch-tarball.test.sh
+
   provenance:
     runs-on: ${{ (github.repository != 'askalf/homebrew-tap' || github.event.pull_request && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]')) && 'ubuntu-latest' || fromJSON('["self-hosted","homebrew-tap-exec"]') }}
     permissions:
