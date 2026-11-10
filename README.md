@@ -16,19 +16,21 @@ dario login --no-proxy   # your Claude plan (Pro, Max 5x or Max 20x); add --manu
 dario proxy              # leave it running, then point any tool at http://localhost:3456 with key `dario`
 ```
 
-`dario login` on its own signs in and then starts the proxy; `--no-proxy` keeps the two steps apart. `dario add altman` adds your ChatGPT plan as a second seat. Everything after that is in [dario's README](https://github.com/askalf/dario#start-in-60-seconds), with [per-tool setup](https://github.com/askalf/dario/blob/master/docs/tools.md).
+When a valid Claude login is already on the machine (Claude Code's, for example), `dario login` on its own goes straight to starting the proxy; `--no-proxy` keeps it to the sign-in, so the two steps stay apart. `dario add altman` adds your ChatGPT plan as a second seat. Everything after that is in [dario's README](https://github.com/askalf/dario#start-in-60-seconds), with [per-tool setup](https://github.com/askalf/dario/blob/master/docs/tools.md).
 
 Upgrade with `brew upgrade dario`. The formula installs the same package as `npm install -g @askalf/dario`, built from the tarball on the npm registry, so `dario --version` matches the npm release. It depends on Homebrew's `node`.
 
 ## How the formula stays current
 
-`bump.yml` runs when dario ships a release (dario's release workflow sends this repository a `dario-release` event), every six hours whether or not that event arrived, and when started by hand. Each run:
+`bump.yml` runs when dario ships a release (dario's release workflow sends this repository a `dario-release` event), every six hours whether or not that event arrived, and when started by hand. A run reads the latest version from the npm registry, and when the formula already names that version it has nothing to bump. Otherwise it:
 
-1. Reads the latest version from the npm registry and downloads that tarball, retrying for about a minute, because the registry can answer 404 for a release published seconds earlier.
+1. Downloads that version's tarball, retrying for about a minute, because the registry can answer 404 for a release published seconds earlier.
 2. Checks the tarball's sha512 against the registry's integrity field.
 3. Verifies its signed npm provenance with `gh attestation verify`: built by dario's `cc-drift-auto-release.yml` on `master`, on a GitHub-hosted runner.
 4. Writes the new `url` and `sha256` into `Formula/dario.rb`, then installs, tests and audits the rewritten formula on the runner.
-5. Only if all of that passed, opens a pull request from a `bot/dario-<version>` branch, and closes any open bump pull request for another version.
+5. Only if all of that passed, opens a pull request from a `bot/dario-<version>` branch, unless one for that version is already open.
+
+Cleanup is separate and best effort: every run that read the latest version and was not cancelled closes each open bump pull request for any other version. That happens when `main` already has the latest version, and also when a later step of the run failed, so it does not depend on the checks above.
 
 `main` takes a change only through a pull request whose checks and review passed. A release published to npm any other way is never picked up.
 
