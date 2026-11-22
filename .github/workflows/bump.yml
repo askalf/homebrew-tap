@@ -57,7 +57,7 @@ jobs:
 
       - name: Check out main to open the pull request from
         if: steps.bump.outputs.changed != ''
-        uses: askalf/ci/actions/checkout-with-retry@96b847244dbb8fd6bce671734b57f48bbad9cefa # main 2026-11-21, askalf/ci#221
+        uses: askalf/ci/actions/checkout-with-retry@9793f4fd0a348154f17310dc3cae44b17c9cb56d # main 2026-11-21, askalf/ci#226
         with:
           path: pull-request
           token: ${{ secrets.TAP_BOT_PAT }}
