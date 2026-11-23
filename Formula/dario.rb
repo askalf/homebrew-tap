@@ -1,8 +1,8 @@
 class Dario < Formula
   desc "Run every AI coding tool you own on your Claude and ChatGPT subscriptions"
   homepage "https://github.com/askalf/dario"
-  url "https://registry.npmjs.org/@askalf/dario/-/dario-6.24.0.tgz"
-  sha256 "d82cfeeb77d1b677774c86e12f70e73219b622d5a2c967127bf3aa93992dc659"
+  url "https://registry.npmjs.org/@askalf/dario/-/dario-6.24.1.tgz"
+  sha256 "4f5fff2c3ae6675c19376673226ea38a45aaf9b54c2d930b7aea8afb8481ee2a"
   license "MIT"
 
   depends_on "node"
